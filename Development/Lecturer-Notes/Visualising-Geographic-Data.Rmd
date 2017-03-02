@@ -1,0 +1,291 @@
+---
+title: "Visualising-Geographic-Data"
+output: 
+  slidy_presentation
+runtime: shiny
+css: "www/teachingnotes.css"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Scattergeo plots
+
+The simplest and most versatile demo of visualising geographic data is a scattergeo plot using leaflet.
+
+We're follow these steps:
+
+- Import data
+- Filter data
+- Visualise data
+
+# Importing Data with readr
+
+The `readr` library is your recommended library for importing rectangular datasets, for instance a set of longitude-latitude pairs.
+
+From the downloaded materials, find the following file:
+
+training_geo-intro-to-R/Handouts/capitals_with_locations.csv
+
+Create a new folder in your project called "data"
+
+Copy the file there
+
+# read_csv and data.frames
+
+The data can now be imported with the following command:
+
+```{r}
+capitals_locations <- read_csv("data/capitals_with_locations.csv")
+```
+
+# Filtering data with dplyr
+
+The `dplyr` library provides an excellent framework for filtering, sorting, augmenting and simplfying datasets. Remember there is an excellent cheatsheet on dplyr from Help -> Cheatsheets.
+
+Assume we're interested in removing portions of the data:
+
+<div class="incremental"> 
+```{r}
+library(dplyr)
+capitals_locations %>%
+  filter(!Continent == "EU")
+```
+</div>
+
+
+# What is %>%?
+
+Almost all libraries from the tidyverse use `%>%` [the pipe operator] as it makes it very easy to build up expressions or operations. It is also incredibly popular in the htmlwidget libraries we'll soon cover.
+
+For an example of why we want to use pipes, I'll borrow the [following example](https://twitter.com/AmeliaMN/status/748193609401327616) from Hadley Wickham:
+
+<div class="incremental">  
+> Little bunny Foo Foo </br>
+> Went hopping through the forest </br>
+> Scooping up the field mice </br>
+> And bopping them on the head </br>
+</div>
+
+<div class="incremental">  
+```{r, eval=FALSE}
+foo_foo <- little_bunny()
+```
+</div>
+
+<div class="incremental">  
+```{r, eval=FALSE}
+bop_on(
+  scoop_up(
+    hop_through(foo_foo, forest),
+    field_mouse
+  ),
+  head
+)
+```
+</div>
+
+<div class="incremental">  
+```{r, eval=FALSE}
+foo_foo %>%
+  hop_through(forest) %>%
+  scoop_up(field_mouse) %>%
+  bop_on(head)
+```
+</div>
+
+# Simpler %>% example
+
+The pipe operator takes the left-hand side of your expression and inserts it into the first argument of the right-hand side of the expression:
+
+<div class="incremental">  
+```{r, eval = FALSE}
+"cats" %>% rep(4)
+```
+</div>
+
+<div class="incremental">  
+Almost completely beyond the scope of this course, the left-hand side can be inserted elsewhere in the right-hand side of the expression using `.`
+</div>
+
+<div class="incremental"> 
+```{r}
+"cats" %>% paste("too","many", .)
+```
+</div>
+<p>
+<div class="incremental"> 
+The `%>%` operator comes from the `magrittr` library and can be read about more [here](https://github.com/smbache/magrittr). While it is often incredibly useful, it is not a hammer to be used without exception - some code is both harder to write and code with pipes.
+</div>
+
+<div class="incremental"> 
+Also - you're allowed to hate pipes. That's fine.
+</div>
+
+# Back to dplyr
+
+We could combine multiple operations from the `dplyr` library together:
+
+```{r}
+capitals_locations %>%
+  filter(!Continent == "EU") %>%
+  filter(country.population < 10000) %>%
+  select(Country, Capital, country.population, longitude, latitude)
+```
+
+# Visualising this data in R
+
+The `ggplot` is an extremely popular and powerful tool for creating static visualisations in R.
+
+```{r}
+library(rworldmap)
+library(ggplot2)
+map.world <- map_data(map="world")
+
+ggplot() + 
+  geom_map(data=map.world, map=map.world, aes(map_id=region, x=long, y=lat)) + 
+  geom_point(data = capitals_locations, aes(x = longitude, y = latitude), color = "red")
+```
+
+
+# htmlwidgets: JavaScript
+
+The interactive web is driven by JavaScript*, the majority of interactive elements that you use on websites are written in JavaScript - from interactive maps to auto-completing pop-up menus. 
+
+```{r, echo=F}
+library(shiny)
+library(leaflet)
+shinyApp(
+  ui = fluidPage(
+    sidebarLayout(
+      sidebarPanel(
+    sliderInput("latitutde", label = "Latitude", min = 5, max = 8, value = 6.9),
+    sliderInput("longitude", label = "Longtidue", min = 15, max = 19, value = 17.7),
+    sliderInput("sd", label = "Standard Deviation of Points", min = 5, max = 20, value = 10),
+    selectInput("mapType", label = "Map Type:", choices = c("OpenStreetMap", "OpenStreetMap.BlackAndWhite","OpenTopoMap"))),
+    mainPanel(
+    leafletOutput("africa_map")
+  ))),
+  server = function(input, output) {
+    
+    output$africa_map <- renderLeaflet({
+      
+      africa_data_points = data.frame(
+      lat = rnorm(100, mean = input$latitutde, sd = input$sd),
+      lng = rnorm(100, mean = input$longitude, sd = input$sd),
+      size = runif(100, 5, 10),
+      popup = as.character(1:100)
+    )
+    
+      m <- leaflet(africa_data_points) %>%
+        addProviderTiles(input$mapType)
+      m %>% addCircleMarkers(radius = ~size, popup = ~popup)
+      
+    })
+  },options = list(height = "100%")
+)
+
+```
+
+# htmlwidgets: The Framework
+
+Like in R, there are hundreds of different JavaScript libraries dedicated to various visualisation tasks. 
+
+There is a package called `htmlwidgets` that allows R developers to easily build bindings to JavaScript libraries, allowing incredibly rich interactive content for the web to be built just with the R language.
+
+# htmlwidgets: The Packages
+
+These bindings to JavaScript libraries are typically distributed as individual R packages; an individual R package for an individual JavaScript library. The <a href="http://htmlwidgets.org">htmlwidgets.org</a> website provides a showcase of some of the `htmlwidget` dependent bindings that are available through CRAN.
+
+# Introduction to leaflet
+
+`leaflet()` instantiates a map, within which we can put data. `addTitles` loads the default "tiles" for the map
+
+<div class="incremental"> 
+```{r}
+library(leaflet)
+capitals_locations %>%
+leaflet() %>%
+  addTiles()
+```
+
+`addCircleMarkers` intelligently looks inside of the `data` for columns that might be longitude and latitude coordinates and creates circles on top of these points.
+
+```{r}
+capitals_locations %>%
+leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers()
+```
+</div>
+
+# Plotly
+
+[plot.ly](http://plot.ly) is both a JavaScript library capable of generating interactive charts & maps and a "point-and-click" tool for building interactive visualisations in the web browser. 
+
+It's highly recommended you check it out, as most of the functionality of the htmlwidget library can be figured out from building charts interactively in the browser.
+
+It's also a good way to introduce the `~column` syntax.
+
+# Plotly and formulae
+
+Let's use sample data from the `WDI` library that allows us to access the World Data Bank:
+
+```{r, message=FALSE, warning=FALSE}
+library(WDI)
+world_data <-
+  WDI(
+  country = c("GB", "EG", "SA", "EE", "CA"),
+  indicator = c("EG.GDP.PUSE.KO.PP","EN.ATM.CO2E.PP.GD.KD","NY.GDP.MKTP.KD"),
+  start = 1990,
+  end = 2000
+  )
+str(world_data)
+```
+
+<div class="incremental"> 
+
+The basic `plot_ly` chart can be constructed as follows, `~` allows us to access the "environment" of the `data` argument. 
+
+The `~` is more usually used in formulae, for instance `pop ~ birth_rate`.
+
+```{r, message=FALSE, warning=FALSE}
+library(plotly)
+plot_ly(data = world_data,
+        x = ~year,
+        y = ~EG.GDP.PUSE.KO.PP,
+        color = ~country)
+```
+
+Full documentation of the API is available here: [plot.ly/r/reference/](https://plot.ly/r/reference/)
+
+```{r, message=FALSE, warning=FALSE}
+plot_ly(data = world_data,
+        x = ~year,
+        y = ~EG.GDP.PUSE.KO.PP,
+        color = ~country,
+        type = "scatter",
+        mode = "lines") %>%
+  layout(xaxis = list(title = "Year"))
+```
+</div>
+
+
+# Exercises (30mins)
+
+That's a very, very quick and basic introduction to two `htmlwidget` libraries it's very important to understand they're simulataneously very different and quite similar to one another.
+
+In completing these exercises please do refer to the documentation for the appropriate library at [htmlwidgets.org](http://www.htmlwidgets.org)
+
+
+
+
+
+
+
+
+
+
+
+
